@@ -133,10 +133,6 @@ int touch_boost_topapp;
 int touch_min_freq_big;
 int touch_min_freq_little;
 
-static struct hw_module_methods_t power_module_methods = {
-    .open = NULL,
-};
-
 static void power_init(struct power_module *module)
 {
     ALOGI("Vox Populi Power HAL initing.");
@@ -463,7 +459,7 @@ static void power_hint(struct power_module *module, power_hint_t hint,
                 if (data) { // Boost duration for scrolls/flings
                     int input_duration = *((int*)data) + fling_min_boost_duration;
                     boost_duration = (input_duration > fling_max_boost_duration) ? fling_max_boost_duration : input_duration;
-                } 
+                }
 
                 struct timespec cur_boost_timespec;
                 clock_gettime(CLOCK_MONOTONIC, &cur_boost_timespec);
@@ -478,17 +474,17 @@ static void power_hint(struct power_module *module, power_hint_t hint,
 
                 // Scrolls/flings
                 if (data) {
-                    int eas_interaction_resources[] = { MIN_FREQ_BIG_CORE_0, fling_min_freq_big, 
-                                                        MIN_FREQ_LITTLE_CORE_0, fling_min_freq_little, 
+                    int eas_interaction_resources[] = { MIN_FREQ_BIG_CORE_0, fling_min_freq_big,
+                                                        MIN_FREQ_LITTLE_CORE_0, fling_min_freq_little,
                                                         0x42C0C000, fling_boost_topapp,
                                                         CPUBW_HWMON_MIN_FREQ, 0x33};
                     interaction(boost_duration, sizeof(eas_interaction_resources)/sizeof(eas_interaction_resources[0]), eas_interaction_resources);
                 }
                 // Touches/taps
                 else {
-                    int eas_interaction_resources[] = { MIN_FREQ_BIG_CORE_0, touch_min_freq_big, 
-                                                        MIN_FREQ_LITTLE_CORE_0, touch_min_freq_little, 
-                                                        0x42C0C000, touch_boost_topapp, 
+                    int eas_interaction_resources[] = { MIN_FREQ_BIG_CORE_0, touch_min_freq_big,
+                                                        MIN_FREQ_LITTLE_CORE_0, touch_min_freq_little,
+                                                        0x42C0C000, touch_boost_topapp,
                                                         CPUBW_HWMON_MIN_FREQ, 0x33};
                     interaction(boost_duration, sizeof(eas_interaction_resources)/sizeof(eas_interaction_resources[0]), eas_interaction_resources);
                 }
@@ -669,7 +665,7 @@ void set_interactive(struct power_module *module, int on)
                 (strlen(governor) == strlen(INTERACTIVE_GOVERNOR))) {
             undo_hint_action(DISPLAY_STATE_HINT_ID);
             display_hint_sent = 0;
-        } else if ((strncmp(governor, MSMDCVS_GOVERNOR, strlen(MSMDCVS_GOVERNOR)) == 0) && 
+        } else if ((strncmp(governor, MSMDCVS_GOVERNOR, strlen(MSMDCVS_GOVERNOR)) == 0) &&
                 (strlen(governor) == strlen(MSMDCVS_GOVERNOR))) {
             if (saved_interactive_mode == -1 || saved_interactive_mode == 0) {
                 /* Display turned on. Restore if possible. */
@@ -848,6 +844,38 @@ static int get_platform_low_power_stats(struct power_module *module,
 
     return 0;
 }
+
+static int power_open(const hw_module_t* module, const char* name,
+                    hw_device_t** device)
+{
+    ALOGD("%s: enter; name=%s", __FUNCTION__, name);
+    int retval = 0; /* 0 is ok; -1 is error */
+    if (strcmp(name, POWER_HARDWARE_MODULE_ID) == 0) {
+        power_module_t *dev = (power_module_t *)calloc(1,
+                sizeof(power_module_t));
+        if (dev) {
+            /* Common hw_device_t fields */
+            dev->common.tag = HARDWARE_MODULE_TAG;
+            dev->common.module_api_version = POWER_MODULE_API_VERSION_0_5;
+            dev->common.module_api_version = HARDWARE_HAL_API_VERSION;
+            dev->init = power_init;
+            dev->powerHint = power_hint;
+            dev->setInteractive = set_interactive;
+            dev->get_number_of_platform_modes = get_number_of_platform_modes;
+            dev->get_platform_low_power_stats = get_platform_low_power_stats;
+            dev->get_voter_list = get_voter_list;
+            *device = (hw_device_t*)dev;
+        } else
+            retval = -ENOMEM;
+    } else {
+        retval = -EINVAL;
+    }
+    ALOGD("%s: exit %d", __FUNCTION__, retval);
+    return retval;
+}
+static struct hw_module_methods_t power_module_methods = {
+    .open = power_open,
+};
 
 void set_feature(struct power_module *module, feature_t feature, int state)
 {
