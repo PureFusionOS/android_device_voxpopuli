@@ -17,5 +17,7 @@ ifeq ($(TARGET_POWERHAL_VARIANT),voxpopuli)
 
 include $(all-subdir-makefiles)
 
+PRODUCT_PROPERTY_OVERRIDES += ro.hardware.power=msm8996
+
 endif
 
